@@ -73,10 +73,18 @@
 # Why the tree looks like this
 #
 # The levels follow communities and RF propagation rather than administrative
-# lines. County boundaries are ignored where they cut through a mesh: Lake
-# Tahoe is one place across three counties, the Mojave gathers the high desert
-# out of four, and Ventura County is split at the Conejo grade because its
-# east half talks to Los Angeles and its west half talks up the coast.
+# lines. A region is a mesh that can hear itself, so a county line is ignored
+# where it cuts through one — Lake Tahoe is one place across three counties.
+# Where the two agree the county stands: SoCal is on its own radio preset
+# rather than the standard USA one and is linked from Santa Barbara to San
+# Diego, so it is one mesh and the counties inside it are what the local groups
+# organise around. Same rule, different answer.
+#
+# Frequencies and presets live at https://wcmesh.com, not here — nothing in
+# this file or the page it feeds sets a radio parameter.
+#
+# What a county cannot draw becomes a tag instead. The high desert reaches
+# across three counties and two regions; `ie` spans three. See `tags` above.
 #
 # Depth follows how big the local community is. Sparse country needs three
 # levels to reach something meaningful; a metro where the county already is
@@ -128,7 +136,10 @@ levels:
 tags:
   - code: ie
     name: Inland Empire
-    blurb: San Bernardino and Riverside valley floor and mountains
+    blurb: The San Bernardino and Riverside valley floor and mountains, plus the Pomona Valley — not the deserts.
+  # OPEN: `highdesert` or `mojave`? Both are said out here, and the places that
+  # carry this are split — Antelope Valley says high desert, Barstow and Needles
+  # say Mojave. Worth settling with the desert operators before anyone deploys.
   - code: highdesert
     name: High Desert
     blurb: Antelope Valley through Victor Valley out to Needles and the Morongo Basin.
@@ -287,10 +298,13 @@ places:
   - code: sacramentofoothills
     name: Sacramento Foothills
     blurb: Sacramento and the foothills north of the Delta.
-    short: SAC FOOTHILLS
+    # Short on purpose. This region now outlines Sacramento and Placer, so its
+    # label lands in the densest dot cluster on the map; "SAC FOOTHILLS" is wide
+    # enough that every gap it fits in belongs to a neighbouring region.
+    short: SAC
     outline: ["Sacramento", "Yolo", "Placer", "Sutter", "Yuba"]
     aliases: ["Yolo County", "Sacramento County", "Placer County", "Sutter County", "Yuba County"]
-    nudge: [-32, -92]
+    nudge: [-21, 23]
     children:
       - code: sacramento
         name: Sacramento Central
@@ -876,8 +890,12 @@ places:
       - code: cvsouth
         name: South Valley
         blurb: Hanford down to Bakersfield.
-        outline: ["Kings", "Tulare"]
-        aliases: ["Kings County", "Tulare County"]
+        # Kern is claimed here now. It used to be split — the Mojave was a level
+        # and took Tehachapi and Ridgecrest out of the county — so nobody could
+        # claim it and it drew as inert background. With the desert a tag, every
+        # Kern place is in this one area and the shape has an owner again.
+        outline: ["Kings", "Tulare", "Kern"]
+        aliases: ["Kings County", "Tulare County", "Kern County"]
         children:
           - code: hanford
             name: Kings County
@@ -933,18 +951,21 @@ places:
             lat: 35.132
             lon: -118.449
             aliases: ["Tehachapi", "Mojave", "California City", "Frazier Park", "Lebec"]
-            tags: [mojave]
+            tags: [highdesert]
           - code: ridgecrest
             name: Indian Wells Valley
             county: Kern
             lat: 35.622
             lon: -117.671
             aliases: ["Ridgecrest", "Inyokern", "China Lake", "Trona"]
-            tags: [mojave]
+            tags: [highdesert]
   - code: socal
     name: Southern California
     blurb: The eight southern counties — Santa Barbara through San Diego, including the Inland Empire and deserts.
     short: SOCAL
+    # Out into the bight. The centroid of this region is the LA-to-IE dot
+    # cluster, so the label has nowhere on land to sit without covering one.
+    nudge: [-12, 53]
     aliases: ["SoCal", "Southern California"]
     children:
       - code: santabarbara
@@ -1088,7 +1109,7 @@ places:
             lat: 34.687
             lon: -118.154
             aliases: ["Lancaster", "Palmdale", "Quartz Hill", "Acton", "Rosamond"]
-            tags: [mojave]
+            tags: [highdesert]
       - code: oc
         name: Orange County
         blurb: Anaheim down to San Clemente.
@@ -1149,34 +1170,38 @@ places:
             lon: -116.911
             aliases: ["Big Bear Lake", "Lake Arrowhead", "Running Springs", "Crestline", "Wrightwood"]
             tags: [ie]
+          # An `applevalley` tag was carried here and nowhere else. A tag on one
+          # place buys nothing the place's own code doesn't already give you, so
+          # it is dropped — Apple Valley stays searchable through the aliases.
+          # Add it back only if it grows to cover several places.
           - code: victorville
             name: Victor Valley
             county: San Bernardino
             lat: 34.536
             lon: -117.291
             aliases: ["Victorville", "Apple Valley", "Hesperia", "Adelanto", "Phelan"]
-            tags: [mojave, applevalley]
+            tags: [highdesert]
           - code: barstow
             name: Barstow
             county: San Bernardino
             lat: 34.896
             lon: -117.017
             aliases: ["Barstow", "Newberry Springs", "Yermo", "Baker"]
-            tags: [mojave]
+            tags: [highdesert]
           - code: needles
             name: Needles
             county: San Bernardino
             lat: 34.848
             lon: -114.614
             aliases: ["Needles", "Havasu Lake", "Big River"]
-            tags: [mojave]
+            tags: [highdesert]
           - code: yuccavalley
             name: Morongo Basin
             county: San Bernardino
             lat: 34.114
             lon: -116.432
             aliases: ["Yucca Valley", "Joshua Tree", "Twentynine Palms", "Landers", "Pioneertown"]
-            tags: [mojave]
+            tags: [highdesert]
       - code: riverside
         name: Riverside County
         blurb: "The valley floor, mountains and Coachella Valley."
