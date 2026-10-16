@@ -79,8 +79,8 @@ window.RegionData.ready(function (DATA) {
 
   // Ancestors, nearest first — "Del Norte County · North Coast".
   function ancestry(node) {
-    return node.trail.slice().reverse().map(function (code) {
-      return DATA.byCode[code].name;
+    return node.trail.slice().reverse().map(function (id) {
+      return DATA.byId[id].name;
     }).join(" · ");
   }
 
@@ -117,31 +117,35 @@ window.RegionData.ready(function (DATA) {
   // which left an unplaced marker drawn at the origin.
   gMark.style.display = "none";
 
-  var outlineEls = {};   // place code -> [<path>], one per shape it claims
+  var outlineEls = {};   // place id -> [<path>], one per shape it claims
 
   MAP.shapes.forEach(function (shape) {
     var owner = byShape[shape.name];
     var path = svgEl("path", "map-county");
     path.setAttribute("d", shape.d);
     if (owner) {
+      // `place` is the code, which is what a person reads and what the tests
+      // select on; `id` is what the map resolves by, since two places may share
+      // a code. Every ancestor id goes in `trail`, so "tint everything inside
+      // this place" stays one ~= selector rather than a walk back up the tree.
       path.dataset.place = owner.code;
-      // Every ancestor, so "tint everything inside this place" is one selector
-      // with ~= rather than a walk back up the tree.
+      path.dataset.id = owner.id;
       path.dataset.trail = owner.trail.join(" ");
-      (outlineEls[owner.code] = outlineEls[owner.code] || []).push(path);
+      (outlineEls[owner.id] = outlineEls[owner.id] || []).push(path);
     }
     gCounties.appendChild(path);
   });
 
-  var dotByCode = {};
+  var dotById = {};
 
   points.forEach(function (a) {
     var dot = svgEl("circle", "map-dot");
     dot.setAttribute("cx", a.x);
     dot.setAttribute("cy", a.y);
     dot.dataset.place = a.node.code;
+    dot.dataset.id = a.node.id;
     a.el = dot;
-    dotByCode[a.node.code] = dot;
+    dotById[a.node.id] = dot;
     gDots.appendChild(dot);
   });
 
@@ -150,7 +154,7 @@ window.RegionData.ready(function (DATA) {
   // which for a region like the Sierra means the populated western slope rather
   // than an empty summit.
   DATA.places.forEach(function (place) {
-    var mine = points.filter(function (a) { return a.node.trail.indexOf(place.code) !== -1; });
+    var mine = points.filter(function (a) { return a.node.trail.indexOf(place.id) !== -1; });
     if (!mine.length) { return; }
     var cx = mine.reduce(function (s, a) { return s + a.x; }, 0) / mine.length;
     var cy = mine.reduce(function (s, a) { return s + a.y; }, 0) / mine.length;
@@ -164,6 +168,7 @@ window.RegionData.ready(function (DATA) {
     text.setAttribute("x", text.dataset.baseX);
     text.setAttribute("y", text.dataset.baseY);
     text.dataset.place = place.code;
+    text.dataset.id = place.id;
     // Codes are words now, and "SACRAMENTOVALLEY" across the valley floor is
     // unreadable, so a place may carry a `short` for the label only.
     text.textContent = (place.short || place.code).toUpperCase();
@@ -508,8 +513,8 @@ window.RegionData.ready(function (DATA) {
     // otherwise a label sitting among dots could never be reached.
     var label = hitLabel(evt);
     if (label) {
-      var place = DATA.byCode[label.dataset.place];
-      setHover({ code: place.code, els: [label], label: place.name,
+      var place = DATA.byId[label.dataset.id];
+      setHover({ code: place.id, els: [label], label: place.name,
                  sub: "Click for a " + DATA.levelName(place) + "-wide scope" }, evt);
       return;
     }
@@ -522,15 +527,15 @@ window.RegionData.ready(function (DATA) {
       // ancestors as part of the chain, so this previews what a click actually
       // does — and it means the outline under the pointer responds everywhere,
       // rather than only in the gaps between dots.
-      setHover({ code: dot.node.code, els: [dot.el].concat(enclosingOutlines(dot.node)),
+      setHover({ code: dot.node.id, els: [dot.el].concat(enclosingOutlines(dot.node)),
                  label: dot.node.name, sub: ancestry(dot.node) }, evt);
       return;
     }
 
     var path = evt.target.closest ? evt.target.closest(".map-county") : null;
     if (path && path.dataset.place) {
-      var owner = DATA.byCode[path.dataset.place];
-      setHover({ code: owner.code, els: [path], label: owner.name,
+      var owner = DATA.byId[path.dataset.id];
+      setHover({ code: owner.id, els: [path], label: owner.name,
                  sub: ancestry(owner) + " · click for a " +
                       DATA.levelName(owner) + "-wide scope" }, evt);
       return;
@@ -545,11 +550,37 @@ window.RegionData.ready(function (DATA) {
   // when its dot is hovered. Not necessarily its parent: a level can pass
   // through without claiming a shape of its own, and one that does claim may
   // hold several — the North Bay is four counties.
+  //
+  // Preferring an ancestor that actually covers this place matters, because the
+  // nearest one with any shape at all need not be the one it stands on. Gold
+  // Country claims Amador and Calaveras; Placerville sits in El Dorado, which
+  // its grandparent Sierra Nevada claims. Lighting Gold Country there points at
+  // ground the place is not on, which is worse than pointing further out.
+  function covers(id, node) {
+    var owner = DATA.byId[id];
+    if (!owner || !owner.outline) { return false; }
+    var mine = [].concat(node.county || []);
+    var theirs = [].concat(owner.outline);
+    for (var i = 0; i < mine.length; i++) {
+      if (theirs.indexOf(mine[i]) !== -1) { return true; }
+    }
+    return false;
+  }
+
   function enclosingOutlines(node) {
-    for (var i = node.trail.length - 1; i >= 0; i--) {
+    var i;
+    for (i = node.trail.length - 1; i >= 0; i--) {
+      if (outlineEls[node.trail[i]] && covers(node.trail[i], node)) {
+        return outlineEls[node.trail[i]];
+      }
+    }
+    // Nothing above it claims the ground it is on — a place across a county
+    // line from its own region. Fall back to the nearest shape there is, which
+    // at least says which way its region lies.
+    for (i = node.trail.length - 1; i >= 0; i--) {
       if (outlineEls[node.trail[i]]) { return outlineEls[node.trail[i]]; }
     }
-    return outlineEls[node.code] || [];
+    return outlineEls[node.id] || [];
   }
 
   function setHover(next, evt) {
@@ -608,14 +639,14 @@ window.RegionData.ready(function (DATA) {
     if (dragged > 4) { return; }
 
     var label = hitLabel(evt);
-    if (label) { window.SettingsState.select(label.dataset.place); return; }
+    if (label) { window.SettingsState.select(label.dataset.id); return; }
 
     var at = svgPoint(evt);
     var dot = nearestDot(at.x, at.y);
-    if (dot) { window.SettingsState.select(dot.node.code); return; }
+    if (dot) { window.SettingsState.select(dot.node.id); return; }
 
     var path = evt.target.closest ? evt.target.closest(".map-county") : null;
-    if (path && path.dataset.place) { window.SettingsState.select(path.dataset.place); }
+    if (path && path.dataset.id) { window.SettingsState.select(path.dataset.id); }
   });
 
   function hitLabel(evt) {
@@ -636,13 +667,13 @@ window.RegionData.ready(function (DATA) {
     clearMarks("is-in-region");
 
     window.SettingsState.picked().forEach(function (pick) {
-      (outlineEls[pick.code] || []).forEach(function (el) { mark(el, "is-on"); });
-      mark(dotByCode[pick.code], "is-on");
-      mark(gLabels.querySelector('[data-place="' + pick.code + '"]'), "is-on");
+      (outlineEls[pick.id] || []).forEach(function (el) { mark(el, "is-on"); });
+      mark(dotById[pick.id], "is-on");
+      mark(gLabels.querySelector('[data-id="' + pick.id + '"]'), "is-on");
 
       // Tint every shape inside it, so picking something with no outline of its
       // own — a region, today — still shows its extent.
-      gCounties.querySelectorAll('[data-trail~="' + pick.code + '"]').forEach(function (el) {
+      gCounties.querySelectorAll('[data-trail~="' + pick.id + '"]').forEach(function (el) {
         mark(el, "is-in-region");
       });
     });
